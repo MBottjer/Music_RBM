@@ -27,7 +27,7 @@ def get_songs(path):
     return songs
 
 songs = get_songs('Pop_Music_Midi') #These songs have already been converted from midi to msgpack
-print "{} songs processed".format(len(songs))
+print("{} songs processed".format(len(songs)))
 ###################################################
 
 ### HyperParameters
@@ -74,8 +74,8 @@ def gibbs_sample(k):
 
     #Run gibbs steps for k iterations
     ct = tf.constant(0) #counter
-    [_, _, x_sample] = control_flow_ops.While(lambda count, num_iter, *args: count < num_iter,
-                                         gibbs_step, [ct, tf.constant(k), x], 1, False)
+    cond = lambda count, k, x: tf.less(count, k)
+    [_, _, x_sample] = tf.while_loop(cond, gibbs_step, [ct, tf.constant(k), x])
     #This is not strictly necessary in this implementation, but if you want to adapt this code to use one of TensorFlow's
     #optimizers, you need this in order to stop tensorflow from propagating gradients back through the gibbs step
     x_sample = tf.stop_gradient(x_sample) 
@@ -92,9 +92,9 @@ h_sample = sample(tf.sigmoid(tf.matmul(x_sample, W) + bh))
 
 #Next, we update the values of W, bh, and bv, based on the difference between the samples that we drew and the original values
 size_bt = tf.cast(tf.shape(x)[0], tf.float32)
-W_adder  = tf.mul(lr/size_bt, tf.sub(tf.matmul(tf.transpose(x), h), tf.matmul(tf.transpose(x_sample), h_sample)))
-bv_adder = tf.mul(lr/size_bt, tf.reduce_sum(tf.sub(x, x_sample), 0, True))
-bh_adder = tf.mul(lr/size_bt, tf.reduce_sum(tf.sub(h, h_sample), 0, True))
+W_adder  = tf.multiply(lr/size_bt, tf.subtract(tf.matmul(tf.transpose(x), h), tf.matmul(tf.transpose(x_sample), h_sample)))
+bv_adder = tf.multiply(lr/size_bt, tf.reduce_sum(tf.subtract(x, x_sample), 0, True))
+bh_adder = tf.multiply(lr/size_bt, tf.reduce_sum(tf.subtract(h, h_sample), 0, True))
 #When we do sess.run(updt), TensorFlow will run all 3 update steps
 updt = [W.assign_add(W_adder), bv.assign_add(bv_adder), bh.assign_add(bh_adder)]
 
@@ -105,7 +105,7 @@ updt = [W.assign_add(W_adder), bv.assign_add(bv_adder), bh.assign_add(bh_adder)]
 with tf.Session() as sess:
     #First, we train the model
     #initialize the variables of the model
-    init = tf.initialize_all_variables()
+    init = tf.global_variables_initializer()
     sess.run(init)
     #Run through all of the training data num_epochs times
     for epoch in tqdm(range(num_epochs)):
@@ -113,8 +113,8 @@ with tf.Session() as sess:
             #The songs are stored in a time x notes format. The size of each song is timesteps_in_song x 2*note_range
             #Here we reshape the songs so that each training example is a vector with num_timesteps x 2*note_range elements
             song = np.array(song)
-            song = song[:np.floor(song.shape[0]/num_timesteps)*num_timesteps]
-            song = np.reshape(song, [song.shape[0]/num_timesteps, song.shape[1]*num_timesteps])
+            song = song[:int(np.floor(song.shape[0]/num_timesteps)*num_timesteps)]
+            song = np.reshape(song, [int(song.shape[0]/num_timesteps), int(song.shape[1]*num_timesteps)])
             #Train the RBM on batch_size examples at a time
             for i in range(1, len(song), batch_size): 
                 tr_x = song[i:i+batch_size]
